@@ -16,10 +16,15 @@
 
 package org.jivesoftware.spark.util;
 
+import org.jivesoftware.Spark;
 import org.jivesoftware.spark.ui.login.GSSAPIConfiguration;
 import org.jivesoftware.spark.util.log.Log;
 import org.jivesoftware.sparkimpl.settings.local.LocalPreferences;
 import org.jivesoftware.sparkimpl.settings.local.SettingsManager;
+import waffle.windows.auth.IWindowsCredentialsHandle;
+import waffle.windows.auth.impl.WindowsAccountImpl;
+import waffle.windows.auth.impl.WindowsCredentialsHandleImpl;
+import waffle.windows.auth.impl.WindowsSecurityContextImpl;
 
 import javax.security.auth.Subject;
 import javax.security.auth.login.Configuration;
@@ -64,46 +69,64 @@ public class SSOUtils
      */
     public static String getKerberosName()
     {
-        final LocalPreferences localPreferences = SettingsManager.getLocalPreferences();
-        if ( localPreferences.getDebug() )
+        if ( Spark.isWindows() )
         {
-            System.setProperty( "java.security.krb5.debug", "true" );
+            final IWindowsCredentialsHandle clientCredentials = WindowsCredentialsHandleImpl.getCurrent( "Kerberos" );
+            clientCredentials.initialize();
+
+            // initial client security context
+            final WindowsSecurityContextImpl clientContext = new WindowsSecurityContextImpl();
+            clientContext.setPrincipalName( WindowsAccountImpl.getCurrentUsername() );
+            clientContext.setCredentialsHandle( clientCredentials );
+            clientContext.setSecurityPackage( "Kerberos" );
+            clientContext.initialize( null, null, WindowsAccountImpl.getCurrentUsername() );
+
+            return clientContext.getPrincipalName();
         }
-        System.setProperty( "javax.security.auth.useSubjectCredsOnly", "false" );
-
-        String ssoMethod = localPreferences.getSSOMethod();
-        if(!ModelUtil.hasLength(ssoMethod)) {
-            ssoMethod = "file";
-        }
-
-        GSSAPIConfiguration config = new GSSAPIConfiguration( ssoMethod.equals("file") );
-        Configuration.setConfiguration( config );
-
-        LoginContext lc;
-        try
+        else
         {
-            lc = new LoginContext( "com.sun.security.jgss.krb5.initiate" );
-            lc.login();
-        }
-        catch ( LoginException le )
-        {
-            Log.debug( le.getMessage() );
+            final LocalPreferences localPreferences = SettingsManager.getLocalPreferences();
+            if ( localPreferences.getDebug() )
+            {
+                System.setProperty( "java.security.krb5.debug", "true" );
+            }
+            System.setProperty( "javax.security.auth.useSubjectCredsOnly", "false" );
+
+            String ssoMethod = localPreferences.getSSOMethod();
+            if ( !ModelUtil.hasLength( ssoMethod ) )
+            {
+                ssoMethod = "file";
+            }
+
+            GSSAPIConfiguration config = new GSSAPIConfiguration( ssoMethod.equals( "file" ) );
+            Configuration.setConfiguration( config );
+
+            LoginContext lc;
+            try
+            {
+                lc = new LoginContext( "com.sun.security.jgss.krb5.initiate" );
+                lc.login();
+            }
+            catch ( LoginException le )
+            {
+                Log.debug( le.getMessage() );
+                return null;
+            }
+
+            Subject mySubject = lc.getSubject();
+
+            for ( Principal principal : mySubject.getPrincipals() )
+            {
+                String name = principal.getName();
+                int indexOne = name.indexOf( "@" );
+                // TODO: This is existing behavior from the old implementation. Shouldn't we check for the principal being an instance of KerberosPrincipal instead?
+                if ( indexOne != -1 )
+                {
+                    return principal.getName();
+                }
+            }
             return null;
         }
-
-        Subject mySubject = lc.getSubject();
-
-        for ( Principal principal : mySubject.getPrincipals() )
-        {
-            String name = principal.getName();
-            int indexOne = name.indexOf( "@" );
-            // TODO: This is existing behavior from the old implementation. Shouldn't we check for the principal being an instance of KerberosPrincipal instead?
-            if ( indexOne != -1 )
-            {
-                return principal.getName();
-            }
-        }
-        return null;
     }
 
     /**

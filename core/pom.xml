@@ -261,6 +261,12 @@
             <artifactId>bctls-jdk15on</artifactId>
             <version>1.57</version>
         </dependency>
+
+        <dependency>
+            <groupId>com.github.waffle</groupId>
+            <artifactId>waffle-jna</artifactId>
+            <version>1.8.2</version>
+        </dependency>
     </dependencies>
 
     <repositories>
