@@ -44,11 +44,11 @@ import org.jivesoftware.spark.ui.login.LoginSettingDialog;
 import org.jivesoftware.spark.util.*;
 import org.jivesoftware.spark.util.SwingWorker;
 import org.jivesoftware.spark.util.log.Log;
-import org.jivesoftware.sparkimpl.plugin.manager.Enterprise;
-import org.jivesoftware.sparkimpl.certificates.SparkSSLSocketFactory;
 import org.jivesoftware.sparkimpl.certificates.SparkSSLContext;
+import org.jivesoftware.sparkimpl.certificates.SparkSSLSocketFactory;
 import org.jivesoftware.sparkimpl.plugin.layout.LayoutSettings;
 import org.jivesoftware.sparkimpl.plugin.layout.LayoutSettingsManager;
+import org.jivesoftware.sparkimpl.plugin.manager.Enterprise;
 import org.jivesoftware.sparkimpl.settings.JiveInfo;
 import org.jivesoftware.sparkimpl.settings.local.LocalPreferences;
 import org.jivesoftware.sparkimpl.settings.local.SettingsManager;
@@ -60,14 +60,11 @@ import javax.naming.directory.Attributes;
 import javax.naming.directory.DirContext;
 import javax.naming.directory.InitialDirContext;
 import javax.net.ssl.SSLContext;
-import javax.security.auth.Subject;
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.CallbackHandler;
 import javax.security.auth.callback.NameCallback;
 import javax.security.auth.callback.PasswordCallback;
 import javax.security.auth.login.Configuration;
-import javax.security.auth.login.LoginContext;
-import javax.security.auth.login.LoginException;
 import javax.swing.*;
 import javax.swing.text.JTextComponent;
 import java.awt.*;
@@ -77,12 +74,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.security.KeyManagementException;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.security.NoSuchProviderException;
-import java.security.Principal;
-import java.security.UnrecoverableKeyException;
+import java.security.*;
 import java.util.*;
 import java.util.List;
 
@@ -1013,31 +1005,19 @@ public class LoginDialog {
                 GSSAPIConfiguration config = new GSSAPIConfiguration( ssoMethod.equals("file") );
                 Configuration.setConfiguration(config);
 
-                LoginContext lc;
-                String princName = localPref.getLastUsername();
+                String princName = null;
                 String princRealm = null;
-                try {
-                    lc = new LoginContext("com.sun.security.jgss.krb5.initiate");
-                    lc.login();
-                    Subject mySubject = lc.getSubject();
 
-
-                    for (Principal p : mySubject.getPrincipals()) {
-                        //TODO: check if principal is a kerberos principal first...
-                        String name = p.getName();
-                        int indexOne = name.indexOf("@");
-                        if (indexOne != -1) {
-                            princName = name.substring(0, indexOne);
-                            accountNameLabel.setText(name);
-                            princRealm = name.substring(indexOne+1);
-                        }
-                        loginButton.setEnabled(true);
-                    }
+                if ( SSOUtils.getKerberosName() != null )
+                {
+                    accountNameLabel.setText( SSOUtils.getKerberosName() );
+                    princName = SSOUtils.getKerberosPrimary();
+                    princRealm = SSOUtils.getKerberosRealm();
+                    loginButton.setEnabled(true);
                 }
-                catch (LoginException le) {
-                    Log.debug(le.getMessage());
+                else
+                {
                     accountNameLabel.setText(Res.getString("title.login.no.account"));
-                    //useSSO(false);
                 }
 
                 String ssoKdc;

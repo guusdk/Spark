@@ -5,19 +5,14 @@ import org.jivesoftware.resource.Res;
 import org.jivesoftware.spark.component.WrappedLabel;
 import org.jivesoftware.spark.util.ModelUtil;
 import org.jivesoftware.spark.util.ResourceUtils;
-import org.jivesoftware.spark.util.log.Log;
+import org.jivesoftware.spark.util.SSOUtils;
 import org.jivesoftware.sparkimpl.settings.local.LocalPreferences;
 import org.jivesoftware.sparkimpl.settings.local.SettingsManager;
 
-import javax.security.auth.Subject;
-import javax.security.auth.login.Configuration;
-import javax.security.auth.login.LoginContext;
-import javax.security.auth.login.LoginException;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.security.Principal;
 
 import static java.awt.GridBagConstraints.*;
 
@@ -48,19 +43,10 @@ class SsoLoginSettingsPanel extends JPanel implements ActionListener
         useSaslGssapiSmack3compatBox.addActionListener( this );
 
         final WrappedLabel wrappedLabel = new WrappedLabel();
-        String principalName = null;
-        try
-        {
-            principalName = getPrincipalName();
-        }
-        catch ( Exception e )
-        {
-            // Ignore
-        }
 
-        if ( ModelUtil.hasLength( principalName ) )
+        if ( SSOUtils.getKerberosName() != null )
         {
-            wrappedLabel.setText( Res.getString( "title.advanced.connection.sso.account", principalName ) );
+            wrappedLabel.setText( Res.getString( "title.advanced.connection.sso.account", SSOUtils.getKerberosName() ) );
         }
         else
         {
@@ -138,48 +124,6 @@ class SsoLoginSettingsPanel extends JPanel implements ActionListener
         useSaslGssapiSmack3compatBox.setSelected( localPreferences.isSaslGssapiSmack3Compatible() );
 
         setFormEnabled( useSSOBox.isSelected() );
-    }
-
-    /**
-     * Returns the principal name if one exists.
-     *
-     * @return the name (ex. derek) of the principal.
-     * @throws Exception thrown if a Principal was not found.
-     */
-    private String getPrincipalName() throws Exception
-    {
-        if ( localPreferences.getDebug() )
-        {
-            System.setProperty( "java.security.krb5.debug", "true" );
-        }
-        System.setProperty( "javax.security.auth.useSubjectCredsOnly", "false" );
-        GSSAPIConfiguration config = new GSSAPIConfiguration( false );
-        Configuration.setConfiguration( config );
-
-        LoginContext lc;
-        try
-        {
-            lc = new LoginContext( "com.sun.security.jgss.krb5.initiate" );
-            lc.login();
-        }
-        catch ( LoginException le )
-        {
-            Log.debug( le.getMessage() );
-            return null;
-        }
-
-        Subject mySubject = lc.getSubject();
-
-        for ( Principal p : mySubject.getPrincipals() )
-        {
-            String name = p.getName();
-            int indexOne = name.indexOf( "@" );
-            if ( indexOne != -1 )
-            {
-                return name;
-            }
-        }
-        return null;
     }
 
     public void actionPerformed( ActionEvent e )
