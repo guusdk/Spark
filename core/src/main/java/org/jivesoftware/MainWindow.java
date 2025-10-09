@@ -231,13 +231,6 @@ public final class MainWindow extends ChatFrame implements ActionListener {
      * setting the Agent to be offline.
      */
     public void shutdown() {
-        final AbstractXMPPConnection con = SparkManager.getConnection();
-
-        if (con.isConnected()) {
-            // Send disconnect.
-            con.disconnect();
-        }
-
         // Notify all MainWindowListeners
         try {
             fireWindowShutdown();
@@ -245,9 +238,16 @@ public final class MainWindow extends ChatFrame implements ActionListener {
         catch (Exception ex) {
             Log.error(ex);
         }
-        // Close application.
-        System.exit(1);
+        finally {
+            final AbstractXMPPConnection con = SparkManager.getConnection();
+            if (con.isConnected()) {
+                // Send disconnect.
+                con.disconnect();
+            }
 
+            // Close application.
+            System.exit(1);
+        }
     }
 
     /**
